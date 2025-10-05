@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Math Learning Lab - Fun, Accessible Math</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for a calming, accessible experience */
+        :root {
+            --color-primary: #4f46e5; /* Indigo */
+            --color-secondary: #10b981; /* Emerald */
+            --color-background: #f8fafc; /* Light Gray/White */
+            --color-text: #1f2937; /* Dark Gray */
+            --color-focus: #fbbf24; /* Amber */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-background);
+            color: var(--color-text);
+            transition: background-color 0.3s;
+        }
+        /* Custom class for large, easily tappable buttons */
+        .math-button {
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        }
+        .math-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        }
+        .math-button:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        /* Style for the interactive object display */
+        #object-display {
+            min-height: 200px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 1rem;
+            border: 2px solid #e5e7eb; /* Light border */
+            border-radius: 1rem;
+            background-color: white;
+        }
+        .counter-object {
+            cursor: pointer;
+            user-select: none;
+            font-size: 2.5rem; /* Large emoji size */
+            line-height: 1;
+            transition: transform 0.1s;
+        }
+        .counter-object:hover {
+            transform: scale(1.1);
+        }
+        /* Input and feedback styling */
+        .math-input {
+            border: 2px solid var(--color-primary);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            font-size: 1.5rem;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.2s;
+            width: 100%;
+            max-width: 200px;
+        }
+        .math-input:focus {
+            border-color: var(--color-secondary);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main Application Container -->
+    <div id="app" class="min-h-screen p-4 sm:p-8">
+
+        <!-- Header and Navigation -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-800">The Fun Math Lab</h1>
+            <p class="text-xl text-gray-600 mt-2">Math is better with friends and games!</p>
+            <nav class="mt-6 flex flex-wrap justify-center gap-3">
+                <button onclick="showModule('counting')" class="math-button bg-indigo-500 text-white hover:bg-indigo-600 focus:ring-4 focus:ring-indigo-300">
+                    🔢 Counting & Place Value
+                </button>
+                <button onclick="showModule('operations')" class="math-button bg-emerald-500 text-white hover:bg-emerald-600 focus:ring-4 focus:ring-emerald-300">
+                    🧮 Operations (x, ÷, +, -)
+                </button>
+                <button onclick="showModule('geometry')" class="math-button bg-amber-500 text-white hover:bg-amber-600 focus:ring-4 focus:ring-amber-300">
+                    🔺🟩 Shape Spotter (Geometry)
+                </button>
+                <button onclick="showModule('welcome')" class="math-button bg-gray-300 text-gray-800 hover:bg-gray-400 focus:ring-4 focus:ring-gray-500">
+                    🏠 Home
+                </button>
+            </nav>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="content-container" class="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl">
+            <!-- Content will be injected here -->
+        </main>
+
+        <!-- Notification/Feedback Modal -->
+        <div id="feedback-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-30 p-4" onclick="hideModal()">
+            <div class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center transform scale-100 transition-transform duration-300" onclick="event.stopPropagation()">
+                <h3 id="modal-title" class="text-3xl font-bold mb-4"></h3>
+                <p id="modal-message" class="text-lg text-gray-600 mb-6"></p>
+                <button onclick="hideModal()" class="math-button bg-indigo-500 text-white focus:ring-4 focus:ring-indigo-300">
+                    Got it!
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Core Application State and Utilities ---
+        const contentContainer = document.getElementById('content-container');
+        const modal = document.getElementById('feedback-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+
+        const OBJECT_EMOJIS = ['🍎', '⭐', '🎈', '🧩', '🚀', '🎁', '💧', '🍪'];
+        const SHAPE_MAP = [
+            { name: "Clock", shape: "Circle", emoji: "🕐" },
+            { name: "Book", shape: "Rectangle", emoji: "📘" },
+            { name: "Slice of Pizza", shape: "Triangle", emoji: "🍕" },
+            { name: "Dice", shape: "Square", emoji: "🎲" }
+        ];
+
+        let currentModule = 'welcome';
+        
+        // --- Adaptive Learning State ---
+        let skillLevel = 1;
+        const MAX_SKILL = 10;
+        let correctStreak = 0;
+        const STREAK_NEEDED = 3;
+        
+        // Global state for the current arithmetic problem
+        let currentProblem = {
+            num1: 0,
+            num2: 0,
+            operator: '',
+            answer: 0
+        };
+
+        /**
+         * Utility to display a simple, non-distracting modal for feedback.
+         * @param {string} title - The main title (e.g., "Correct!").
+         * @param {string} message - The message body.
+         * @param {string} type - "success", "error", or "info" to adjust color.
+         */
+        function showModal(title, message, type = 'success') {
+            modalTitle.textContent = title;
+            modalMessage.innerHTML = message; // Use innerHTML for formatting
+
+            if (type === 'success') {
+                modalTitle.className = 'text-3xl font-bold mb-4 text-emerald-600';
+            } else if (type === 'error') {
+                modalTitle.className = 'text-3xl font-bold mb-4 text-red-600';
+            } else {
+                 modalTitle.className = 'text-3xl font-bold mb-4 text-gray-800';
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function hideModal() {
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }
+
+        /**
+         * Exponential backoff utility for API calls (required but not used here since no API calls are made).
+         */
+        async function fetchWithBackoff(url, options, maxRetries = 5) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return response;
+                } catch (error) {
+                    if (i === maxRetries - 1) throw error;
+                    const delay = Math.pow(2, i) * 1000;
+                    // console.warn(`Retrying in ${delay / 1000}s...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+
+        // --- Module Definitions (HTML Templates) ---
+
+        const welcomeTemplate = `
+            <div class="text-center space-y-6">
+                <h2 class="text-3xl font-semibold text-gray-700">Welcome to the Accessible Math Lab!</h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                    This is a free space to learn math through simple, fun, and non-distracting games. We use clear visuals and easy-to-follow steps to help everyone succeed.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+                    <div class="p-4 bg-indigo-50 rounded-lg shadow-md">
+                        <span class="text-4xl block mb-2">💡</span>
+                        <p class="font-medium">Clear & Predictable Layout</p>
+                    </div>
+                    <div class="p-4 bg-emerald-50 rounded-lg shadow-md">
+                        <span class="text-4xl block mb-2">✨</span>
+                        <p class="font-medium">Immediate Visual Feedback</p>
+                    </div>
+                    <div class="p-4 bg-amber-50 rounded-lg shadow-md">
+                        <span class="text-4xl block mb-2">🏡</span>
+                        <p class="font-medium">Real-World Examples</p>
+                    </div>
+                </div>
+                <p class="pt-4 text-gray-700 font-medium">
+                    Select a module above to begin your adventure!
+                </p>
+            </div>
+        `;
+
+        const countingTemplate = `
+            <div id="counting-module" class="space-y-6">
+                <h2 class="text-3xl font-bold text-indigo-700 border-b pb-3 mb-4">🔢 Counting & Place Value (Up to 20)</h2>
+                <p class="text-gray-600">
+                    Click the "New Set" button to generate items, then click each item to count it. This helps you count and understand groups of ten!
+                </p>
+
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <button onclick="initCountingGame()" class="math-button bg-indigo-500 text-white hover:bg-indigo-600">
+                        Generate New Set (Max 20)
+                    </button>
+                    <div class="text-2xl font-semibold p-3 bg-gray-100 rounded-lg shadow-inner">
+                        <span class="text-gray-700">Total Count:</span> <span id="current-count" class="text-indigo-700">0</span>
+                    </div>
+                </div>
+
+                <!-- Interactive Display Area -->
+                <div class="border-4 border-dashed border-gray-300 p-4 rounded-xl">
+                    <label class="block text-lg font-medium mb-2">Click to Count Them:</label>
+                    <div id="object-display">
+                        <!-- Emojis will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Place Value Visualization -->
+                <div class="pt-4 space-y-4">
+                    <h3 class="text-xl font-semibold text-gray-700">Place Value Breakdown:</h3>
+                    <div class="flex justify-around text-center p-4 bg-indigo-50 rounded-lg shadow-inner">
+                        <div class="w-1/2">
+                            <div class="text-4xl font-extrabold text-indigo-600" id="tens-digit">0</div>
+                            <p class="text-lg font-medium text-indigo-500">Tens (Groups of 10)</p>
+                        </div>
+                        <div class="w-1/2 border-l border-indigo-200">
+                            <div class="text-4xl font-extrabold text-indigo-600" id="ones-digit">0</div>
+                            <p class="text-lg font-medium text-indigo-500">Ones (Remaining)</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        `;
+
+        const operationsTemplate = `
+            <div id="operations-module" class="space-y-6">
+                <h2 class="text-3xl font-bold text-emerald-700 border-b pb-3 mb-4">🧮 Operations Practice (+, -, x, ÷)</h2>
+                <p class="text-gray-600">
+                    Solve the problem and enter your answer. Click the **Hint** button if you need help!
+                </p>
+                
+                <!-- Display Skill Level -->
+                <div class="text-center p-3 bg-indigo-50 rounded-lg shadow-md">
+                    <p class="text-lg font-medium text-indigo-700">
+                        Current Skill Level: <span id="skill-level" class="text-2xl font-extrabold">${skillLevel}</span> / ${MAX_SKILL}
+                    </p>
+                    <p class="text-sm text-gray-600">Get ${STREAK_NEEDED} correct answers in a row to level up!</p>
+                </div>
+
+
+                <!-- Visual Aid Area -->
+                <div id="visual-aid" class="p-4 bg-emerald-100 rounded-xl shadow-inner min-h-[100px] mb-4 text-center">
+                    <p class="text-lg text-gray-500">Visual aid for the problem will appear here.</p>
+                </div>
+
+                <!-- Equation Display -->
+                <div class="flex justify-center items-center p-8 bg-emerald-50 rounded-xl shadow-inner my-6">
+                    <span id="num1" class="text-5xl font-extrabold text-emerald-700 w-1/4 text-right">?</span>
+                    <span id="operator" class="text-5xl font-extrabold text-emerald-700 px-6 w-1/4 text-center">?</span>
+                    <span id="num2" class="text-5xl font-extrabold text-emerald-700 w-1/4 text-left">?</span>
+                    <span class="text-5xl font-extrabold text-emerald-700 px-6 w-1/4 text-center">=</span>
+                </div>
+
+                <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
+                    <input type="number" id="answer-input" class="math-input" placeholder="Your Answer" inputmode="numeric" onkeydown="if(event.key === 'Enter') checkArithmeticAnswer()">
+                    <button onclick="checkArithmeticAnswer()" class="math-button bg-emerald-500 text-white hover:bg-emerald-600">
+                        Check Answer
+                    </button>
+                    <button onclick="showHint()" class="math-button bg-amber-500 text-white hover:bg-amber-600">
+                        ❓ Hint
+                    </button>
+                    <button onclick="initArithmeticGame()" class="math-button bg-gray-300 text-gray-800 hover:bg-gray-400">
+                        New Problem
+                    </button>
+                </div>
+
+                <div id="feedback-message" class="text-center text-xl font-semibold mt-4 min-h-[30px]"></div>
+
+            </div>
+        `;
+
+        const geometryTemplate = `
+            <div id="geometry-module" class="space-y-6">
+                <h2 class="text-3xl font-bold text-amber-700 border-b pb-3 mb-4">🔺🟩 Shape Spotter (Geometry)</h2>
+                <p class="text-gray-600">
+                    Find the objects in the room that match the shapes below. Click them to see what shape they are!
+                </p>
+
+                <div class="p-6 bg-amber-50 rounded-xl shadow-inner">
+                    <h3 class="text-xl font-semibold mb-3">Target Shapes:</h3>
+                    <div class="flex flex-wrap justify-around gap-4">
+                        ${SHAPE_MAP.map(item => `
+                            <div class="text-center p-3 bg-white rounded-lg shadow-md w-32">
+                                <span class="text-4xl block">${item.emoji}</span>
+                                <p class="text-lg font-medium text-gray-700">${item.shape}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <!-- Real-World Scene/Example -->
+                <div class="relative bg-white border-4 border-gray-200 rounded-xl shadow-2xl p-6 min-h-[300px] flex items-center justify-center">
+                    <h4 class="absolute top-3 left-3 text-lg font-medium text-gray-700">The Kitchen Counter:</h4>
+                    
+                    <!-- Clickable Scene Objects (positioned absolute relative to parent) -->
+                    <div id="scene-objects" class="w-full h-full relative" style="min-height: 300px;">
+                        
+                        <!-- 1. Clock (Circle) -->
+                        <div data-shape-index="0" onclick="spotShape(this)" class="absolute top-4 right-4 text-6xl cursor-pointer hover:scale-110 transition-transform duration-200" style="color: #4f46e5;" title="A Wall Clock">
+                            ${SHAPE_MAP[0].emoji}
+                            <span class="absolute top-[-20px] right-[-10px] text-sm text-amber-700 font-bold opacity-0 transition-opacity shape-label"></span>
+                        </div>
+
+                        <!-- 2. Book (Rectangle) -->
+                        <div data-shape-index="1" onclick="spotShape(this)" class="absolute bottom-6 left-1/4 text-6xl cursor-pointer hover:scale-110 transition-transform duration-200" style="color: #10b981;" title="A Reading Book">
+                            ${SHAPE_MAP[1].emoji}
+                            <span class="absolute top-[-20px] right-[-10px] text-sm text-amber-700 font-bold opacity-0 transition-opacity shape-label"></span>
+                        </div>
+
+                        <!-- 3. Slice of Pizza (Triangle) -->
+                        <div data-shape-index="2" onclick="spotShape(this)" class="absolute top-1/2 left-10 transform -translate-y-1/2 text-6xl cursor-pointer hover:scale-110 transition-transform duration-200" style="color: #f59e0b;" title="A Slice of Pizza">
+                            ${SHAPE_MAP[2].emoji}
+                            <span class="absolute top-[-20px] right-[-10px] text-sm text-amber-700 font-bold opacity-0 transition-opacity shape-label"></span>
+                        </div>
+
+                        <!-- 4. Dice (Square/Cube) -->
+                        <div data-shape-index="3" onclick="spotShape(this)" class="absolute bottom-10 right-1/4 text-6xl cursor-pointer hover:scale-110 transition-transform duration-200" style="color: #ef4444;" title="A Six-sided Dice">
+                            ${SHAPE_MAP[3].emoji}
+                            <span class="absolute top-[-20px] right-[-10px] text-sm text-amber-700 font-bold opacity-0 transition-opacity shape-label"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+
+        // --- Navigation Logic ---
+        function showModule(moduleName) {
+            currentModule = moduleName;
+            let template = '';
+
+            switch (moduleName) {
+                case 'counting':
+                    template = countingTemplate;
+                    break;
+                case 'operations':
+                    template = operationsTemplate;
+                    break;
+                case 'geometry':
+                    template = geometryTemplate;
+                    break;
+                case 'welcome':
+                default:
+                    template = welcomeTemplate;
+                    break;
+            }
+
+            // Smoothly change content
+            contentContainer.style.opacity = 0;
+            setTimeout(() => {
+                contentContainer.innerHTML = template;
+                contentContainer.style.opacity = 1;
+
+                // Initialize game state after DOM is updated
+                if (moduleName === 'counting') {
+                    initCountingGame();
+                } else if (moduleName === 'operations') {
+                    initArithmeticGame();
+                }
+            }, 300); // Match transition duration
+        }
+
+        // --- Game 1: Counting & Place Value Logic ---
+
+        let totalObjects = 0;
+        let objectsClicked = 0;
+
+        function initCountingGame() {
+            const display = document.getElementById('object-display');
+            if (!display) return; // Exit if not on the counting page
+
+            // Generate a random number between 5 and 20
+            totalObjects = Math.floor(Math.random() * 16) + 5;
+            objectsClicked = 0;
+
+            // Update UI elements to reset
+            document.getElementById('current-count').textContent = '0';
+            document.getElementById('tens-digit').textContent = '0';
+            document.getElementById('ones-digit').textContent = '0';
+
+            display.innerHTML = '';
+            const randomEmoji = OBJECT_EMOJIS[Math.floor(Math.random() * OBJECT_EMOJIS.length)];
+
+            // Create and display the objects
+            for (let i = 0; i < totalObjects; i++) {
+                const object = document.createElement('span');
+                object.textContent = randomEmoji;
+                object.className = 'counter-object';
+                object.setAttribute('data-counted', 'false');
+                object.onclick = handleObjectClick;
+                object.title = `Click to count this ${randomEmoji}`;
+                display.appendChild(object);
+            }
+
+             showModal("Ready to Count!", `Click all ${totalObjects} of the ${randomEmoji}s to count them!`, 'info');
+        }
+
+        function handleObjectClick(event) {
+            const object = event.target;
+            if (object.getAttribute('data-counted') === 'true') {
+                return; // Already counted
+            }
+
+            objectsClicked++;
+            object.setAttribute('data-counted', 'true');
+            object.style.transform = 'scale(0.8)';
+            object.style.opacity = '0.5';
+            object.style.color = 'var(--color-secondary)'; // Change color when counted
+
+            // Update count
+            document.getElementById('current-count').textContent = objectsClicked;
+
+            // Update Place Value
+            document.getElementById('tens-digit').textContent = Math.floor(objectsClicked / 10);
+            document.getElementById('ones-digit').textContent = objectsClicked % 10;
+
+            // Check for completion
+            if (objectsClicked === totalObjects) {
+                showModal("Great Job!", `You counted all ${totalObjects} items! That's ${Math.floor(totalObjects / 10)} Tens and ${totalObjects % 10} Ones.`, 'success');
+            }
+        }
+
+
+        // --- Game 2: Arithmetic Logic (All Operations & Adaptive Difficulty) ---
+
+        /**
+         * Maps the current skill level to problem generation parameters.
+         */
+        function getDifficultyParams() {
+            let maxRange, maxFactor, allowedOperators;
+            
+            if (skillLevel <= 1) {
+                // Level 1: Easy addition up to 10
+                maxRange = 10;
+                maxFactor = 0;
+                allowedOperators = ['+'];
+            } else if (skillLevel === 2) {
+                // Level 2: Addition/Subtraction up to 15
+                maxRange = 15;
+                maxFactor = 0;
+                allowedOperators = ['+', '-'];
+            } else if (skillLevel === 3) {
+                // Level 3: Addition/Subtraction up to 25
+                maxRange = 25;
+                maxFactor = 0;
+                allowedOperators = ['+', '-'];
+            } else if (skillLevel === 4) {
+                // Level 4: Introduce basic multiplication (2x, 3x, 4x)
+                maxRange = 30; // Max result for +,-
+                maxFactor = 4;
+                allowedOperators = ['+', '-', 'x'];
+            } else if (skillLevel === 5) {
+                // Level 5: Introduce basic division and larger factors
+                maxRange = 40;
+                maxFactor = 5;
+                allowedOperators = ['+', '-', 'x', '/'];
+            } else if (skillLevel >= 6) {
+                // Level 6+: Full range of operations, larger numbers
+                maxRange = 50 + (skillLevel - 6) * 10; // Max range grows
+                maxFactor = 8 + (skillLevel - 6); // Max factor grows
+                maxFactor = Math.min(maxFactor, 12); // Cap factor max
+                allowedOperators = ['+', '-', 'x', '/'];
+            }
+
+            return { maxRange, maxFactor, allowedOperators };
+        }
+
+        /**
+         * Adjusts the skill level based on the result.
+         * @param {boolean} isCorrect - True if the last answer was correct.
+         */
+        function updateSkillLevel(isCorrect) {
+            const skillEl = document.getElementById('skill-level');
+            
+            if (isCorrect) {
+                correctStreak++;
+                if (correctStreak >= STREAK_NEEDED && skillLevel < MAX_SKILL) {
+                    skillLevel++;
+                    correctStreak = 0; // Reset streak after level up
+                    showModal("Level UP!", `You've reached Skill Level ${skillLevel}! Problems will now be a little more challenging. Keep it up!`, 'success');
+                }
+            } else {
+                correctStreak = 0; // Reset streak on incorrect answer
+                if (skillLevel > 1) {
+                    skillLevel--;
+                    showModal("Adjustment", `Let's practice the basics. Skill level decreased to ${skillLevel}. Keep trying!`, 'error');
+                }
+            }
+
+            if(skillEl) {
+                skillEl.textContent = skillLevel;
+            }
+        }
+        
+        /**
+         * Generates the visual representation for the arithmetic problem.
+         */
+        function generateEmojiVisuals(num1, num2, operator) {
+            const visualAid = document.getElementById('visual-aid');
+            if (!visualAid) return;
+
+            const emoji = OBJECT_EMOJIS[Math.floor(Math.random() * OBJECT_EMOJIS.length)];
+            let html = '';
+
+            if (operator === '+' || operator === '-') {
+
+                if (operator === '+') {
+                    // Visual for Addition (Groups of emojis)
+                    const num1Emojis = Array(num1).fill(emoji).join('');
+                    const num2Emojis = Array(num2).fill(emoji).join('');
+
+                    html = `
+                        <div class="text-xl font-bold mb-2 text-emerald-800">You start with ${num1} ${emoji}s and **add ${num2} more**.</div>
+                        <div class="flex justify-center items-center text-4xl sm:text-5xl flex-wrap">
+                            <span class="p-2 bg-white rounded-lg shadow">${num1Emojis}</span>
+                            <span class="mx-4 text-emerald-700 text-3xl">+</span>
+                            <span class="p-2 bg-white rounded-lg shadow">${num2Emojis}</span>
+                        </div>
+                    `;
+                } else { // Subtraction: Using the 'tally and cross out' method
+                    let itemsHtml = '';
+                    
+                    // Generate individual spans for each item for better visual control
+                    for (let i = 0; i < num1; i++) {
+                        let style = '';
+                        let text = emoji;
+                        
+                        if (i < num2) {
+                            // These are the items being subtracted (crossed out)
+                            // Use text-decoration: line-through and slight fade/color change
+                            style = 'opacity: 0.3; text-decoration: line-through; color: #ef4444;'; // Red, crossed out
+                        }
+                        
+                        // Use a smaller font size to allow more items to fit
+                        itemsHtml += `<span style="font-size: 2rem; margin: 4px; display: inline-block; ${style}">${text}</span>`;
+                    }
+
+                    html = `
+                        <div class="text-xl font-bold mb-2 text-emerald-800">You have **${num1} ${emoji}s**. We will **cross out ${num2}**. Count how many are left!</div>
+                        <div class="flex justify-center flex-wrap gap-1 p-2 bg-white rounded-lg shadow">
+                            ${itemsHtml}
+                        </div>
+                    `;
+                }
+            } else if (operator === 'x') {
+                 // Visual for Multiplication (Groups description)
+                html = `
+                    <div class="text-2xl font-bold text-emerald-800">
+                        Multiplication is **repeated addition**.
+                        <p class="mt-2 text-xl">Imagine **${num1} groups** with **${num2} items** in each group.</p>
+                        <p class="text-lg text-gray-700">${num1} x ${num2} is the same as: ${Array(num1).fill(num2).join(' + ')}</p>
+                    </div>
+                `;
+            } else { // Division
+                // Visual for Division (Sharing description)
+                html = `
+                    <div class="text-2xl font-bold text-emerald-800">
+                        Division is **splitting a total**.
+                        <p class="mt-2 text-xl">Share **${num1} items** equally among **${num2} friends**. How many does each friend get?</p>
+                        <p class="text-lg text-gray-700">${num1} $\\div$ ${num2} is the same as counting how many groups of ${num2} fit into ${num1}.</p>
+                    </div>
+                `;
+            }
+
+            visualAid.innerHTML = html;
+        }
+
+        function initArithmeticGame() {
+            const num1El = document.getElementById('num1');
+            const num2El = document.getElementById('num2');
+            const operatorEl = document.getElementById('operator');
+            const inputEl = document.getElementById('answer-input');
+            const feedbackEl = document.getElementById('feedback-message');
+
+            if (!num1El || !inputEl) return;
+
+            feedbackEl.textContent = '';
+            inputEl.value = '';
+            inputEl.style.borderColor = 'var(--color-primary)';
+            inputEl.focus();
+
+            const params = getDifficultyParams();
+            const operators = params.allowedOperators;
+            const operator = operators[Math.floor(Math.random() * operators.length)];
+
+            let num1, num2, answer;
+
+            if (operator === '+') {
+                // Addition: use maxRange
+                num1 = Math.floor(Math.random() * (params.maxRange - 5)) + 5;
+                num2 = Math.floor(Math.random() * (params.maxRange / 2)) + 1;
+                answer = num1 + num2;
+                if (answer > 100) answer = 100; // Cap answer for display
+            } else if (operator === '-') {
+                // Subtraction: positive result
+                let a = Math.floor(Math.random() * params.maxRange) + 5;
+                let b = Math.floor(Math.random() * params.maxRange) + 1;
+                num1 = Math.max(a, b);
+                num2 = Math.min(a, b);
+                answer = num1 - num2;
+            } else if (operator === 'x') {
+                // Multiplication: use maxFactor
+                num1 = Math.floor(Math.random() * params.maxFactor) + 2;
+                num2 = Math.floor(Math.random() * params.maxFactor) + 2;
+                answer = num1 * num2;
+            } else { // Division (/)
+                // Division: use maxFactor for divisor/quotient
+                let divisorMax = Math.min(params.maxFactor, 8); // Max divisor 8
+                num2 = Math.floor(Math.random() * divisorMax) + 2; 
+                let quotient = Math.floor(Math.random() * divisorMax) + 2; 
+                num1 = num2 * quotient;
+                answer = quotient;
+            }
+
+            // Store current problem
+            currentProblem.num1 = num1;
+            currentProblem.num2 = num2;
+            currentProblem.operator = operator;
+            currentProblem.answer = answer;
+
+            // Update the display
+            num1El.textContent = num1;
+            num2El.textContent = num2;
+            operatorEl.textContent = operator === '/' ? '÷' : operator; // Use actual division symbol
+            
+            // Generate Visuals
+            generateEmojiVisuals(num1, num2, operator);
+        }
+
+        function checkArithmeticAnswer() {
+            const inputEl = document.getElementById('answer-input');
+            const feedbackEl = document.getElementById('feedback-message');
+            const userAnswer = parseInt(inputEl.value);
+
+            if (isNaN(userAnswer) || inputEl.value.trim() === '') {
+                feedbackEl.textContent = 'Please enter a number.';
+                feedbackEl.className = 'text-center text-xl font-semibold mt-4 text-amber-600';
+                return;
+            }
+
+            if (userAnswer === currentProblem.answer) {
+                feedbackEl.textContent = `✅ Correct! (${currentProblem.num1} ${currentProblem.operator === '/' ? '÷' : currentProblem.operator} ${currentProblem.num2} = ${currentProblem.answer}) Amazing work!`;
+                feedbackEl.className = 'text-center text-xl font-semibold mt-4 text-emerald-600';
+                inputEl.style.borderColor = 'var(--color-secondary)';
+                
+                updateSkillLevel(true); // Update skill after correct answer
+
+                // Automatically generate next question on success
+                setTimeout(initArithmeticGame, 1000); 
+
+            } else {
+                feedbackEl.textContent = `❌ Incorrect. The answer was ${currentProblem.answer}. Try again!`;
+                feedbackEl.className = 'text-center text-xl font-semibold mt-4 text-red-600';
+                inputEl.style.borderColor = 'var(--color-focus)';
+
+                updateSkillLevel(false); // Update skill after incorrect answer
+            }
+        }
+        
+        /**
+         * Provides a conceptual hint for the current problem.
+         */
+        function showHint() {
+            const { num1, num2, operator } = currentProblem;
+            let hintText = '';
+
+            switch (operator) {
+                case '+':
+                    hintText = `Try counting up: start at **${num1}** and count **${num2}** steps forward.`;
+                    break;
+                case '-':
+                    hintText = `Try counting back: start at **${num1}** and count **${num2}** steps backward.`;
+                    break;
+                case 'x':
+                    hintText = `Think of it as adding **${num2}** to itself **${num1}** times.`;
+                    break;
+                case '/':
+                    hintText = `Ask yourself: **${num2}** multiplied by what number equals **${num1}**?`;
+                    break;
+                default:
+                    hintText = 'Focus on the numbers and the operation symbol!';
+            }
+            showModal("❓ Your Hint:", hintText, 'info');
+        }
+
+
+        // --- Game 3: Geometry Logic (Shape Spotter) ---
+
+        function spotShape(element) {
+            const index = element.getAttribute('data-shape-index');
+            const shapeData = SHAPE_MAP[index];
+
+            // Show a temporary label feedback
+            const label = element.querySelector('.shape-label');
+            if (label) {
+                label.textContent = shapeData.shape;
+                label.style.opacity = 1;
+                setTimeout(() => {
+                    label.style.opacity = 0;
+                }, 1500);
+            }
+
+            // Show modal feedback
+            showModal(
+                "Shape Spotted!",
+                `The ${shapeData.name} is a **${shapeData.shape}**! Look around you, can you find other objects with that shape?`,
+                'info'
+            );
+        }
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load the welcome screen on startup
+            showModule('welcome');
+
+            // Preload the counting game logic right after the DOM is ready
+            // (it won't display until the user clicks the nav button)
+            if (document.getElementById('counting-module')) {
+                initCountingGame();
+            }
+        });
+    </script>
+</body>
+</html>
